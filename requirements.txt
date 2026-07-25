@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+aiosqlite
+pydantic
+pydantic-settings
+email-validator
+python-dotenv
+requests
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
+alembic
+aiosmtplib
+jinja2
+cryptography
