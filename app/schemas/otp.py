@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, Union, List
 
 class OTPGenerateRequest(BaseModel):
     identifier: EmailStr
@@ -8,6 +8,9 @@ class OTPGenerateRequest(BaseModel):
     app_name: Optional[str] = "Example App"
     otp_code: Optional[str] = None
     custom_otp_code: Optional[str] = None
+    cc: Optional[Union[List[str], str]] = None
+    bcc: Optional[Union[List[str], str]] = None
+
 
 class OTPGenerateResponse(BaseModel):
     otp_id: str

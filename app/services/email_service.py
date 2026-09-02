@@ -4,13 +4,25 @@ import datetime
 import logging
 import aiosmtplib
 from email.message import EmailMessage
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from app.db.database import db_helper
 from app.services.smtp_service import smtp_service
 from app.services.template_service import template_service
 from app.services.application_service import application_service
 
 logger = logging.getLogger("uvicorn.error")
+
+def _normalize_recipients(val: Optional[Union[List[str], str]]) -> Optional[str]:
+    """Normalize a list or string of emails into a clean comma-separated string."""
+    if not val:
+        return None
+    if isinstance(val, str):
+        emails = [e.strip() for e in val.replace(";", ",").split(",") if e.strip()]
+        return ", ".join(emails) if emails else None
+    elif isinstance(val, list):
+        emails = [str(e).strip() for e in val if str(e).strip()]
+        return ", ".join(emails) if emails else None
+    return None
 
 class EmailService:
     async def send_templated_email(
@@ -19,6 +31,8 @@ class EmailService:
         to_email: str,
         variables: dict,
         to_name: Optional[str] = None,
+        cc: Optional[Union[List[str], str]] = None,
+        bcc: Optional[Union[List[str], str]] = None,
         app_id: Optional[str] = None,
         metadata: Optional[dict] = None
     ) -> dict:
@@ -31,6 +45,8 @@ class EmailService:
         return await self._send_and_log(
             to_email=to_email,
             to_name=to_name,
+            cc=cc,
+            bcc=bcc,
             subject=rendered["subject"],
             html_body=rendered["html_body"],
             text_body=rendered["text_body"],
@@ -46,12 +62,16 @@ class EmailService:
         html_body: str,
         text_body: Optional[str] = "",
         to_name: Optional[str] = None,
+        cc: Optional[Union[List[str], str]] = None,
+        bcc: Optional[Union[List[str], str]] = None,
         app_id: Optional[str] = None,
         metadata: Optional[dict] = None
     ) -> dict:
         return await self._send_and_log(
             to_email=to_email,
             to_name=to_name,
+            cc=cc,
+            bcc=bcc,
             subject=subject,
             html_body=html_body,
             text_body=text_body or "",
@@ -69,10 +89,15 @@ class EmailService:
         text_body: str,
         app_id: Optional[str],
         template_id: Optional[str],
-        metadata: dict
+        metadata: dict,
+        cc: Optional[Union[List[str], str]] = None,
+        bcc: Optional[Union[List[str], str]] = None,
     ) -> dict:
         log_id = str(uuid.uuid4())
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+        cc_str = _normalize_recipients(cc)
+        bcc_str = _normalize_recipients(bcc)
 
         smtp_config = None
         if app_id:
@@ -85,13 +110,17 @@ class EmailService:
 
         if not smtp_config:
             error_msg = "No active SMTP configuration found in dashboard settings."
-            await self._create_log(log_id, app_id, template_id, None, to_email, to_name, subject, "failed", error_msg, metadata, now)
+            await self._create_log(log_id, app_id, template_id, None, to_email, to_name, cc_str, bcc_str, subject, "failed", error_msg, metadata, now)
             raise RuntimeError(error_msg)
 
         msg = EmailMessage()
         msg["From"] = f"{smtp_config['from_name']} <{smtp_config['from_email']}>"
         recipient_header = f"{to_name} <{to_email}>" if to_name else to_email
         msg["To"] = recipient_header
+        if cc_str:
+            msg["Cc"] = cc_str
+        if bcc_str:
+            msg["Bcc"] = bcc_str
         msg["Subject"] = subject
         
         if text_body:
@@ -123,7 +152,7 @@ class EmailService:
 
         await self._create_log(
             log_id, app_id, template_id, smtp_config["id"],
-            to_email, to_name, subject, status, error_message, metadata, now, sent_at if status == "sent" else None
+            to_email, to_name, cc_str, bcc_str, subject, status, error_message, metadata, now, sent_at if status == "sent" else None
         )
 
         return {
@@ -135,17 +164,18 @@ class EmailService:
 
     async def _create_log(
         self, log_id, app_id, template_id, smtp_config_id,
-        recipient_email, recipient_name, subject, status, error_message, metadata, created_at, sent_at=None
+        recipient_email, recipient_name, cc, bcc, subject, status, error_message, metadata, created_at, sent_at=None
     ):
         async with db_helper.get_db_connection() as db:
             await db.execute("""
             INSERT INTO email_logs (
                 id, app_id, template_id, smtp_config_id, recipient_email, recipient_name,
-                subject, status, error_message, metadata, sent_at, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                cc, bcc, subject, status, error_message, metadata, sent_at, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 log_id, app_id, template_id, smtp_config_id,
-                recipient_email, recipient_name, subject, status, error_message,
+                recipient_email, recipient_name, cc, bcc,
+                subject, status, error_message,
                 json.dumps(metadata), sent_at, created_at
             ))
             await db.commit()
@@ -184,9 +214,9 @@ class EmailService:
                 params.append(status)
 
             if search:
-                query += " AND (el.recipient_email LIKE ? OR el.subject LIKE ? OR a.name LIKE ? OR a.api_key LIKE ?)"
+                query += " AND (el.recipient_email LIKE ? OR el.subject LIKE ? OR a.name LIKE ? OR a.api_key LIKE ? OR el.cc LIKE ? OR el.bcc LIKE ?)"
                 search_term = f"%{search}%"
-                params.extend([search_term, search_term, search_term, search_term])
+                params.extend([search_term, search_term, search_term, search_term, search_term, search_term])
 
             query += " ORDER BY el.created_at DESC LIMIT ? OFFSET ?"
             params.extend([limit, offset])

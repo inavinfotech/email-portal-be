@@ -3,7 +3,7 @@ import random
 import secrets
 import uuid
 import datetime
-from typing import Optional
+from typing import Optional, Union, List
 from app.db.database import db_helper
 from app.core.config import settings
 from app.services.email_service import email_service
@@ -29,7 +29,9 @@ class OTPService:
         template_slug: str = "otp-verification",
         app_id: Optional[str] = None,
         app_name: Optional[str] = "Example App",
-        custom_code: Optional[str] = None
+        custom_code: Optional[str] = None,
+        cc: Optional[Union[List[str], str]] = None,
+        bcc: Optional[Union[List[str], str]] = None
     ) -> dict:
         otp_id = str(uuid.uuid4())
         if custom_code and custom_code.strip():
@@ -67,6 +69,8 @@ class OTPService:
             res = await email_service.send_templated_email(
                 template_slug=template_slug,
                 to_email=identifier,
+                cc=cc,
+                bcc=bcc,
                 variables={
                     "otp_code": raw_code,
                     "expiry_minutes": str(settings.OTP_EXPIRY_MINUTES),

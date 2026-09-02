@@ -17,7 +17,9 @@ async def generate_otp(req: OTPGenerateRequest, current_client: dict = Depends(g
         template_slug=req.template_slug,
         app_id=app_id,
         app_name=app_name,
-        custom_code=custom_code
+        custom_code=custom_code,
+        cc=req.cc,
+        bcc=req.bcc
     )
     return res
 

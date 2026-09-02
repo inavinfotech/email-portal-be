@@ -69,6 +69,8 @@ class EmailLog(Base):
     smtp_config_id = Column(String, nullable=True)
     recipient_email = Column(String, nullable=False)
     recipient_name = Column(String, nullable=True)
+    cc = Column(Text, nullable=True)
+    bcc = Column(Text, nullable=True)
     subject = Column(String, nullable=False)
     status = Column(String, nullable=False, default="queued")
     error_message = Column(Text, nullable=True)

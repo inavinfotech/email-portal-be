@@ -13,6 +13,8 @@ async def send_templated_email(req: SendTemplatedEmailRequest, current_client: d
             template_slug=req.template_slug,
             to_email=req.to_email,
             to_name=req.to_name,
+            cc=req.cc,
+            bcc=req.bcc,
             variables=req.variables,
             app_id=app_id,
             metadata=req.metadata
@@ -28,6 +30,8 @@ async def send_raw_email(req: SendRawEmailRequest, current_client: dict = Depend
         res = await email_service.send_raw_email(
             to_email=req.to_email,
             to_name=req.to_name,
+            cc=req.cc,
+            bcc=req.bcc,
             subject=req.subject,
             html_body=req.html_body,
             text_body=req.text_body,
@@ -48,6 +52,8 @@ async def send_bulk_emails(req: SendBulkEmailRequest, current_client: dict = Dep
                 template_slug=req.template_slug,
                 to_email=recipient.to_email,
                 to_name=recipient.to_name,
+                cc=recipient.cc,
+                bcc=recipient.bcc,
                 variables=recipient.variables,
                 app_id=app_id,
                 metadata=req.metadata
@@ -57,3 +63,4 @@ async def send_bulk_emails(req: SendBulkEmailRequest, current_client: dict = Dep
             results.append({"status": "failed", "recipient": recipient.to_email, "error": str(e)})
 
     return {"total": len(req.recipients), "results": results}
+

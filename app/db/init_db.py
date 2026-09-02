@@ -310,6 +310,8 @@ async def init_db():
             smtp_config_id TEXT,
             recipient_email TEXT NOT NULL,
             recipient_name TEXT,
+            cc TEXT,
+            bcc TEXT,
             subject TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'queued',
             error_message TEXT,
@@ -320,6 +322,14 @@ async def init_db():
             FOREIGN KEY (template_id) REFERENCES email_templates(id) ON DELETE SET NULL
         );
         """)
+
+        # Migration check: ensure cc and bcc columns exist in existing database
+        cursor = await db.execute("PRAGMA table_info(email_logs);")
+        columns = [row["name"] for row in await cursor.fetchall()]
+        if "cc" not in columns:
+            await db.execute("ALTER TABLE email_logs ADD COLUMN cc TEXT;")
+        if "bcc" not in columns:
+            await db.execute("ALTER TABLE email_logs ADD COLUMN bcc TEXT;")
 
         # 5. otp_records table
         await db.execute("""
